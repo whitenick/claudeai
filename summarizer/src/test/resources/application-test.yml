@@ -1,0 +1,27 @@
+# Test configuration for Java 21 Spring Boot application
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: password
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+  h2:
+    console:
+      enabled: false
+
+  # Disable SQL initialization for tests
+  sql:
+    init:
+      mode: never
+
+logging:
+  level:
+    com.flo.summarizer: WARN
+    org.springframework: WARN
+    org.hibernate: WARN
