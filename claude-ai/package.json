@@ -1,0 +1,36 @@
+{
+  "name": "admin-notes-ai-poc",
+  "version": "1.0.0",
+  "description": "POC for AI-powered admin notes summarization using PostgreSQL pub/sub",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "build": "bun build src/index.ts --target node --outdir dist",
+    "start": "bun dist/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "bun src/scripts/seed.ts",
+    "test:retry": "bun src/test-retry.ts",
+    "db:migrate-manual": "psql $DATABASE_URL -f migrations/002_failed_jobs.sql"
+  },
+  "keywords": ["fastify", "drizzle", "postgresql", "ai", "claude", "pub/sub"],
+  "author": "Flo Team",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.3",
+    "fastify": "^4.24.3",
+    "@fastify/cors": "^8.4.0",
+    "drizzle-orm": "^0.29.1",
+    "postgres": "^3.4.3",
+    "zod": "^3.22.4",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "@types/uuid": "^9.0.7",
+    "drizzle-kit": "^0.20.6",
+    "typescript": "^5.3.3"
+  }
+}
