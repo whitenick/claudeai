@@ -70,7 +70,7 @@ export class AiProviderFactory {
   /**
    * Get recommended settings for different use cases
    */
-  static getRecommendedSettings(
+static getRecommendedSettings(
     useCase: 'summarization' | 'analysis' | 'conversation' | 'creative'
   ) {
     const settings = {

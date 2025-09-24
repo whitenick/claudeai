@@ -19,9 +19,9 @@ FROM oven/bun:1-slim as production
 
 WORKDIR /app
 
-# Create non-root user
+# Create nodejs group and use existing bun user
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 --ingroup nodejs bun
+    usermod -a -G nodejs bun
 
 # Copy built application
 COPY --from=base /app/dist ./dist

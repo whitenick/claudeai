@@ -117,12 +117,12 @@ export class AIService {
       try {
         await notificationClient.unsafe(`
           SELECT pg_notify('summary_failed', '${JSON.stringify({
-            student_id: event.student_id,
-            note_id: event.id,
-            error: error instanceof Error ? error.message : 'Unknown error',
-            created_at: new Date().toISOString(),
-            event_type: 'summary_failed'
-          })}')
+          student_id: event.student_id,
+          note_id: event.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          created_at: new Date().toISOString(),
+          event_type: 'summary_failed'
+        })}')
         `);
       } catch (notifyError) {
         console.error('Failed to notify error:', notifyError);
@@ -142,18 +142,8 @@ export class AIService {
       messages: [{ role: 'user', content: prompt }],
       maxTokens: settings.maxTokens,
       temperature: settings.temperature,
-      systemPrompt: `You are an educational assistant that summarizes admin notes about students.
-      Your goal is to help educators quickly understand a student's situation, progress, and needs.
-
-      Focus on:
-      - Key themes and patterns across notes
-      - Recent developments or changes in behavior/performance
-      - Areas of concern or achievement
-      - Recommended follow-up actions
-      - Overall student trajectory
-
-      Keep summaries concise but comprehensive, using bullet points when appropriate.
-      Always maintain a professional, supportive tone focused on student success.`
+      systemPrompt: `Create a short summary of all notes provided in the input. Keep the summary brief, 
+      with a maximum of three sentences. Highlight areas of excellence, and an area of improvement. Flag any concerns. `
     };
 
     try {
@@ -186,14 +176,7 @@ ${sortedNotes.map((note, index) => `
 ${note.content}
 `).join('\n')}
 
-Generate a comprehensive summary that helps educators understand:
-1. **Key Themes**: What patterns emerge across these notes?
-2. **Recent Developments**: Any notable changes or trends?
-3. **Achievements**: Positive developments and successes
-4. **Concerns**: Areas that need attention or intervention
-5. **Next Steps**: Recommended actions for educators
-
-Format the response with clear sections and bullet points for readability.`;
+Be strict about a concise, 3 sentence max, summary. Any information an admin must know at a glance.`;
   }
 
   /**

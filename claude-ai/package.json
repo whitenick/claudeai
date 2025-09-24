@@ -8,24 +8,24 @@
     "dev": "bun --watch src/index.ts",
     "build": "bun build src/index.ts --target node --outdir dist",
     "start": "bun dist/index.js",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:generate": "drizzle-kit generate:pg",
+    "db:migrate": "drizzle-kit push:pg",
     "db:studio": "drizzle-kit studio",
     "db:seed": "bun src/scripts/seed.ts",
     "test:retry": "bun src/test-retry.ts",
     "db:migrate-manual": "psql $DATABASE_URL -f migrations/002_failed_jobs.sql"
   },
-  "keywords": ["fastify", "drizzle", "postgresql", "ai", "claude", "pub/sub"],
+  "keywords": ["hono", "drizzle", "postgresql", "ai", "claude", "pub/sub"],
   "author": "Flo Team",
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.3",
-    "fastify": "^4.24.3",
-    "@fastify/cors": "^8.4.0",
+    "@hono/node-server": "^1.19.4",
     "drizzle-orm": "^0.29.1",
+    "hono": "^4.9.8",
     "postgres": "^3.4.3",
-    "zod": "^3.22.4",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/node": "^20.10.5",

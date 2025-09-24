@@ -1,14 +1,13 @@
-import { FastifyInstance, FastifyPluginOptions } from 'fastify';
+import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import { db } from '../db/index.js';
 import { EventListener } from '../services/event-listener.js';
 
-export async function healthRoutes(
-  fastify: FastifyInstance,
-  options: FastifyPluginOptions & { eventListener: EventListener }
-): Promise<void> {
+export function healthRoutes(app: Hono, eventListener: EventListener) {
+  const routes = new Hono();
 
   // Basic health check
-  fastify.get('/health', async (request, reply) => {
+  routes.get('/health', async (c) => {
     try {
       // Test database connection
       await db.execute`SELECT 1`;
@@ -22,23 +21,28 @@ export async function healthRoutes(
         environment: process.env.NODE_ENV || 'development'
       };
 
-      return health;
+      return c.json(health);
 
     } catch (error) {
-      fastify.log.error('Health check failed:', error);
+      console.error('Health check failed:', error);
 
-      reply.code(503);
-      return {
-        status: 'unhealthy',
-        timestamp: new Date().toISOString(),
-        service: 'admin-notes-ai-poc',
-        error: 'Database connection failed'
-      };
+      throw new HTTPException(503, {
+        message: 'Database connection failed',
+        res: new Response(JSON.stringify({
+          status: 'unhealthy',
+          timestamp: new Date().toISOString(),
+          service: 'admin-notes-ai-poc',
+          error: 'Database connection failed'
+        }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      });
     }
   });
 
   // Detailed health check with component status
-  fastify.get('/health/detailed', async (request, reply) => {
+  routes.get('/health/detailed', async (c) => {
     const components = {
       database: false,
       eventListener: false,
@@ -52,18 +56,18 @@ export async function healthRoutes(
       await db.execute`SELECT 1`;
       components.database = true;
     } catch (error) {
-      fastify.log.error('Database health check failed:', error);
+      console.error('Database health check failed:', error);
       overallStatus = 'degraded';
     }
 
     // Check event listener
     try {
-      components.eventListener = options.eventListener.isRunning();
+      components.eventListener = eventListener.isRunning();
       if (!components.eventListener) {
         overallStatus = 'degraded';
       }
     } catch (error) {
-      fastify.log.error('Event listener health check failed:', error);
+      console.error('Event listener health check failed:', error);
       overallStatus = 'degraded';
     }
 
@@ -83,10 +87,7 @@ export async function healthRoutes(
       overallStatus = 'degraded';
     }
 
-    const statusCode = overallStatus === 'healthy' ? 200 : 503;
-    reply.code(statusCode);
-
-    return {
+    const response = {
       status: overallStatus,
       timestamp: new Date().toISOString(),
       service: 'admin-notes-ai-poc',
@@ -94,15 +95,17 @@ export async function healthRoutes(
       uptime: process.uptime(),
       components
     };
+
+    return c.json(response, overallStatus === 'healthy' ? 200 : 503);
   });
 
   // Readiness probe (for Kubernetes)
-  fastify.get('/ready', async (request, reply) => {
+  routes.get('/ready', async (c) => {
     try {
       // Test critical dependencies
       await db.execute`SELECT 1`;
 
-      if (!options.eventListener.isRunning()) {
+      if (!eventListener.isRunning()) {
         throw new Error('Event listener not running');
       }
 
@@ -113,29 +116,36 @@ export async function healthRoutes(
         'openai': process.env.OPENAI_API_KEY
       };
 
-      if (!apiKeyMap[aiProvider]) {
+      if (!apiKeyMap[aiProvider as keyof typeof apiKeyMap]) {
         throw new Error(`${aiProvider} API key not configured`);
       }
 
-      return { status: 'ready' };
+      return c.json({ status: 'ready' });
 
     } catch (error) {
-      fastify.log.error('Readiness check failed:', error);
+      console.error('Readiness check failed:', error);
 
-      reply.code(503);
-      return {
-        status: 'not ready',
-        reason: error instanceof Error ? error.message : 'Unknown error'
-      };
+      throw new HTTPException(503, {
+        message: 'Service not ready',
+        res: new Response(JSON.stringify({
+          status: 'not ready',
+          reason: error instanceof Error ? error.message : 'Unknown error'
+        }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      });
     }
   });
 
   // Liveness probe (for Kubernetes)
-  fastify.get('/live', async (request, reply) => {
-    return {
+  routes.get('/live', async (c) => {
+    return c.json({
       status: 'alive',
       timestamp: new Date().toISOString(),
       uptime: process.uptime()
-    };
+    });
   });
+
+  return routes;
 }

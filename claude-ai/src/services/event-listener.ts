@@ -5,6 +5,7 @@ import { AdminNoteCreatedEvent, SummaryCompletedEvent, SummaryFailedEvent } from
 export class EventListener {
   private aiService = new AIService();
   private isListening = false;
+  private subscriptions: Array<{ unlisten: () => Promise<void> }> = [];
 
   async startListening(): Promise<void> {
     if (this.isListening) {
@@ -16,7 +17,7 @@ export class EventListener {
 
     try {
       // Listen to admin notes creation events
-      await notificationClient.listen('admin_notes_created', async (payload) => {
+      const adminNotesSubscription = await notificationClient.listen('admin_notes_created', async (payload) => {
         try {
           const event: AdminNoteCreatedEvent = JSON.parse(payload);
           console.log(`📝 Received admin_notes_created: ${event.id} for student ${event.student_id}`);
@@ -25,9 +26,10 @@ export class EventListener {
           console.error('❌ Failed to process admin_notes_created event:', error);
         }
       });
+      this.subscriptions.push(adminNotesSubscription);
 
       // Listen to summary completion events (for logging/monitoring)
-      await notificationClient.listen('summary_completed', (payload) => {
+      const summaryCompletedSubscription = await notificationClient.listen('summary_completed', (payload) => {
         try {
           const event: SummaryCompletedEvent = JSON.parse(payload);
           console.log(`✅ Summary completed: ${event.id} for student ${event.student_id} (${event.note_count} notes)`);
@@ -35,9 +37,10 @@ export class EventListener {
           console.error('Failed to parse summary_completed event:', error);
         }
       });
+      this.subscriptions.push(summaryCompletedSubscription);
 
       // Listen to summary failure events
-      await notificationClient.listen('summary_failed', (payload) => {
+      const summaryFailedSubscription = await notificationClient.listen('summary_failed', (payload) => {
         try {
           const event: SummaryFailedEvent = JSON.parse(payload);
           console.error(`❌ Summary failed for student ${event.student_id}: ${event.error}`);
@@ -45,6 +48,7 @@ export class EventListener {
           console.error('Failed to parse summary_failed event:', error);
         }
       });
+      this.subscriptions.push(summaryFailedSubscription);
 
       this.isListening = true;
       console.log('✅ PostgreSQL event listener started successfully');
@@ -63,9 +67,9 @@ export class EventListener {
     console.log('🛑 Stopping PostgreSQL event listener...');
 
     try {
-      await notificationClient.unlisten('admin_notes_created');
-      await notificationClient.unlisten('summary_completed');
-      await notificationClient.unlisten('summary_failed');
+      // Unlisten from all subscriptions
+      await Promise.all(this.subscriptions.map(subscription => subscription.unlisten()));
+      this.subscriptions = [];
 
       this.isListening = false;
       console.log('✅ PostgreSQL event listener stopped');

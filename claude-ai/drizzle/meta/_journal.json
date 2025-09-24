@@ -1,0 +1,20 @@
+{
+  "version": "5",
+  "dialect": "pg",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1758682079337,
+      "tag": "0000_robust_longshot",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1758683050464,
+      "tag": "0001_bored_moondragon",
+      "breakpoints": true
+    }
+  ]
+}

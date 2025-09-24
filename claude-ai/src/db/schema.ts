@@ -18,6 +18,9 @@ export const aiSummaries = pgTable('ai_summaries', {
   createdAt: timestamp('created_at').defaultNow().notNull()
 });
 
+// Export failed jobs tables
+export * from './failed-jobs-schema';
+
 // Type inference for TypeScript
 export type AdminNote = typeof adminNotes.$inferSelect;
 export type NewAdminNote = typeof adminNotes.$inferInsert;
