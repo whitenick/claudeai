@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: bedrock-summarizer-postgres
+    environment:
+      POSTGRES_DB: bedrock_summarizer
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Optional: LocalStack for local AWS service emulation
+  localstack:
+    image: localstack/localstack:latest
+    container_name: bedrock-summarizer-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=bedrock,sqs,secretsmanager
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+    volumes:
+      - localstack_data:/tmp/localstack
+
+volumes:
+  postgres_data:
+  localstack_data:

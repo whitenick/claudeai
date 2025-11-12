@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew clean build:*)",
+      "Bash(gradle wrapper:*)",
+      "Bash(gradle build:*)",
+      "Read(//Users/nickwhite/.gradle/caches/**)",
+      "Bash(xargs jar tf:*)",
+      "Bash(xargs javap:*)",
+      "WebSearch",
+      "Bash(javap:*)",
+      "Bash(jar -tf:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

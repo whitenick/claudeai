@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/nickwhite/Development/Github/whitenick/claudeai/summarizer/**)",
+      "Read(///**)",
+      "Read(//Users/nickwhite/Development/Github/FloRecruitSpringBoot/**)",
+      "Bash(tree:*)",
+      "Bash(chmod:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

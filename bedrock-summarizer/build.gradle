@@ -1,0 +1,284 @@
+buildscript {
+    dependencies {
+        classpath 'org.postgresql:postgresql:42.7.5'
+        classpath 'org.flywaydb:flyway-database-postgresql:11.11.1'
+        classpath 'org.apache.httpcomponents.client5:httpclient5:5.3'
+        classpath 'io.github.cdimascio:dotenv-java:3.2.0'
+    }
+}
+
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.3'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'jacoco'
+    id "io.github.surpsg.delta-coverage" version "2.5.0"
+    id 'org.flywaydb.flyway' version '11.11.1'
+    id 'nu.studer.jooq' version '5.2.2'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "io.awspring.cloud:spring-cloud-aws-dependencies:3.2.0"
+        mavenBom "software.amazon.awssdk:bom:2.28.29"
+    }
+}
+
+group = 'com.flo'
+version = '0.0.1-SNAPSHOT'
+
+String floEnv = Objects.requireNonNullElse(System.getenv("FLO_ENV"), "local");
+import io.github.cdimascio.dotenv.Dotenv
+Dotenv dotenv = Dotenv
+        .configure()
+        .directory("${project.projectDir}")
+        .filename(".env.${floEnv}")
+        .load();
+
+def dbHost = dotenv.get("DB_HOST")
+def dbName = dotenv.get("DB_NAME")
+def dbUser = dotenv.get("DB_USER")
+def dbPass = dotenv.get("DB_PASSWORD")
+def dbPort = dotenv.get("DB_PORT")
+def dbSslMode = dotenv.get("DB_SSL_MODE")
+
+def dbUrl = "jdbc:postgresql://${dbHost}:${dbPort}/${dbName}?sslmode=${dbSslMode}"
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs 'src/main/java'
+            srcDirs 'build/generated-src/jooq/main'
+        }
+    }
+}
+
+dependencies {
+    // Spring Boot Starters
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    implementation 'org.springframework.boot:spring-boot-starter-jooq'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // AWS Bedrock SDK
+    implementation 'software.amazon.awssdk:bedrock'
+    implementation 'software.amazon.awssdk:bedrockruntime'
+    implementation 'software.amazon.awssdk:sts'
+    implementation 'software.amazon.awssdk:secretsmanager'
+
+    // AWS Spring Cloud
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-sqs'
+
+    // Utilities
+    implementation 'org.projectlombok:lombok'
+    implementation 'org.mapstruct:mapstruct:1.6.3'
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+
+    // API Documentation
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.9'
+
+    // Micrometer for metrics
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    compileOnly 'org.projectlombok:lombok'
+
+    annotationProcessor 'org.projectlombok:lombok'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+
+    jooqGenerator 'org.postgresql:postgresql:42.7.5'
+    runtimeOnly 'org.postgresql:postgresql:42.7.5'
+
+    // Testing
+    testAnnotationProcessor 'org.projectlombok:lombok'
+    testImplementation ('org.springframework.boot:spring-boot-starter-test') {
+        exclude group: 'org.mockito', module :'mockito-core'
+    }
+    testImplementation 'net.datafaker:datafaker:2.4.4'
+    testImplementation 'org.instancio:instancio-junit:5.0.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+flyway {
+    url = dbUrl
+    user = dbUser
+    password = dbPass
+    driver = 'org.postgresql.Driver'
+    schemas = ['bedrock_summarizer']
+    locations = ['filesystem:src/main/resources/db/migration']
+}
+
+test {
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+def latestMigrationFile = file(layout.buildDirectory.file("flyway/latestMigration.txt"))
+
+import org.flywaydb.gradle.task.FlywayMigrateTask
+import org.flywaydb.core.Flyway
+import org.flywaydb.core.api.output.MigrateResult
+import org.flywaydb.core.api.MigrationInfo
+import org.flywaydb.core.api.MigrationInfoService
+import org.flywaydb.core.api.MigrationVersion
+
+class ObservableFlywayMigrateTask extends FlywayMigrateTask {
+    @OutputFile
+    def outputFile
+
+    {
+        group = 'database'
+        description = 'Custom Flyway migration task that saves latest migration id to file'
+        outputs.upToDateWhen { false }
+    }
+
+    @Override
+    protected Object run(Flyway flyway) {
+        MigrateResult result = super.run(flyway) as MigrateResult
+        MigrationInfoService info = flyway.info()
+        MigrationInfo current = info.current()
+        MigrationVersion currentSchemaVersion = current == null ? MigrationVersion.EMPTY : current.getVersion()
+        println "Flyway num migrations executed: ${result.migrationsExecuted}; current version: ${currentSchemaVersion}"
+        outputFile.parentFile.mkdirs()
+        outputFile.text = currentSchemaVersion.toString()
+        return result
+    }
+}
+
+tasks.register('flywayMigrateObserve', ObservableFlywayMigrateTask) {
+    outputFile latestMigrationFile
+}
+
+ext['jooq.version'] = '3.20.2'
+
+jooq {
+    version = '3.20.2'
+    configurations {
+        main {
+            generationTool {
+                jdbc {
+                    driver = 'org.postgresql.Driver'
+                    url = dbUrl
+                    user = dbUser
+                    password = dbPass
+                    properties {
+                        property {
+                            key = 'ssl'
+                            value = 'false'
+                        }
+                    }
+                }
+                generator {
+                    name = 'org.jooq.codegen.DefaultGenerator'
+                    database {
+                        unsignedTypes = false
+                        name = 'org.jooq.meta.postgres.PostgresDatabase'
+                        inputSchema = 'bedrock_summarizer'
+                    }
+                    generate {
+                        deprecated = false
+                        daos = true
+                        springAnnotations = true
+                        records = true
+                        pojos = true
+                        immutablePojos = false
+                        fluentSetters = true
+                    }
+                    target {
+                        packageName = 'com.flo.jooq'
+                    }
+                    strategy.name = 'org.jooq.codegen.DefaultGeneratorStrategy'
+                }
+            }
+        }
+    }
+}
+
+tasks.named('generateJooq').configure {
+    dependsOn('flywayMigrateObserve')
+    allInputsDeclared = true
+    inputs.file(latestMigrationFile)
+
+    doLast {
+        def latestMigrationVersion = latestMigrationFile.text
+        println "Generated Jooq classes based on migration version: $latestMigrationVersion from $latestMigrationFile"
+    }
+}
+
+compileJava.dependsOn generateJooq
+
+jacocoTestReport {
+    reports {
+        xml.required = true
+        xml.outputLocation = layout.buildDirectory.file("reports/jacoco/report.xml")
+        html.required = true
+        html.outputLocation = layout.buildDirectory.dir("reports/jacoco")
+        csv.required = false
+    }
+    afterEvaluate {
+        classDirectories.setFrom(classDirectories.files.collect { dir ->
+            fileTree(dir).exclude("**/flo/jooq/**")
+        })
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            element = 'BUNDLE'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.75
+            }
+            limit {
+                counter = 'BRANCH'
+                value = 'COVEREDRATIO'
+                minimum = 0.33
+            }
+        }
+    }
+    afterEvaluate {
+        classDirectories.setFrom(classDirectories.files.collect { dir ->
+            fileTree(dir).exclude("**/flo/jooq/**")
+        })
+    }
+}
+
+deltaCoverageReport {
+    diffSource {
+        git.compareWith "refs/remotes/origin/main"
+    }
+    reports {
+        html.set(true)
+    }
+}
+
+tasks.register('checkCi') {
+    dependsOn 'test'
+    dependsOn 'deltaCoverage'
+    dependsOn 'jacocoTestCoverageVerification'
+}
+
+[JavaExec, Test].each { type ->
+    tasks.withType(type).configureEach {
+        environment 'SPRING_PROFILES_ACTIVE', dotenv.get("SPRING_PROFILES_ACTIVE")
+        environment 'DB_HOST', dbHost
+        environment 'DB_NAME', dbName
+        environment 'DB_USER', dbUser
+        environment 'DB_PASSWORD', dbPass
+        environment 'DB_PORT', dbPort
+        environment 'DB_SSL_MODE', dbSslMode
+        environment 'AWS_REGION', dotenv.get("AWS_REGION")
+    }
+}
